@@ -366,6 +366,7 @@ var registerUser = function (username, userOrg, isJson) {
 
 var loginRegisteredUser = function (username, userOrg) {
 	var member;
+	var enrollmentSecret;
 	var client = getClientForOrg(userOrg);
 	return hfc.newDefaultKeyValueStore({
 		path: getKeyStoreForOrg(getOrgName(userOrg))
