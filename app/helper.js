@@ -373,6 +373,7 @@ var loginRegisteredUser = function (username, userOrg) {
 		// clearing the user context before switching
 		client._userContext = null;
 		return client.getUserContext(username, true).then((user) => {
+			logger.debug(util.format('user:%s',JSON.stringify(user)));
 			if (user && user.isEnrolled()) {
 				logger.info('Successfully loaded member from persistence');
 				return user;
