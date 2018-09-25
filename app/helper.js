@@ -403,7 +403,7 @@ var loginRegisteredUser = function (username, userOrg) {
 						return message;
 					}
 					logger.debug(username + ' enrolled successfully');
-
+					logger.debug(util.format('message: %s', JSON.stringify(message)));
 					member = new User(username);
 					member._enrollmentSecret = enrollmentSecret;
 					return member.setEnrollment(message.key, message.certificate, getMspID(userOrg));
