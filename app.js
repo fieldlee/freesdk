@@ -17,8 +17,6 @@ let path = require('path');
 let hfc = require('fabric-client');
 let app = express();
 
-let secretKey = "wadhotgfxgmbvsegdswtilnbczaej";
-
 hfc.addConfigFile(path.join(__dirname, 'config.json'));
 
 var helper = require('./app/helper.js');
@@ -61,36 +59,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
 	extended: false
 }));
-// set secret variable
-app.set('secret', secretKey);
-// login 
-app.use(expressJWT({ secret: secretKey }).unless({ path: ['/login','/register', '/blocktxnum','/blockchat'] }));
-app.use(bearerToken());
-app.use(function (req, res, next) {
-	if (req.originalUrl.indexOf('/login') >= 0 || req.originalUrl.indexOf('/blocktxnum') >= 0|| req.originalUrl.indexOf('/blockchat') >= 0 || req.originalUrl.indexOf('/register') >= 0) {
-		return next();
-	}
-	var token = req.token;
-	jwt.verify(token, app.get('secret'), function (err, decoded) {
-		logger.info(decoded);
-		if (err) {
-			res.send({
-				success: false,
-				info: 'Failed to authenticate token. Make sure to include the ' +
-					'token returned from /login call in the authorization header ' +
-					' as a Bearer token'
-			});
-			return;
-		} else {
-			// add the decoded user name and org name to the request object
-			// for the downstream code to use
-			req.username = decoded.username;
-			req.orgname = decoded.orgName;
-			logger.debug(util.format('Decoded from JWT token: username - %s, orgname - %s', decoded.username, decoded.orgName));
-			return next();
-		}
-	});
-});
+
 ///////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// START SERVER /////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -159,7 +128,6 @@ app.post('/register',function (req, res) {
 		res.json(getErrorMessage('\'orgName\''));
 		return;
 	}
-
 	helper.registerUser(username, orgName, true).then(function (response) {
 		if (response && typeof response !== 'string') {
 			res.send(response);
@@ -171,265 +139,15 @@ app.post('/register',function (req, res) {
 		}
 	});
 });
-// Create Channel
-app.post('/channels', function (req, res) {
-	logger.info('<<<<<<<<<<<<<<<<< C R E A T E  C H A N N E L >>>>>>>>>>>>>>>>>');
-	var channelName;
-	var channelConfigPath;
-	if (req.body.channelName) {
-		channelName = req.body.channelName;
-	} else {
-		channelName = defaultChannelId; //默认第一个Channel
-	}
 
-	for (const chanindex in chanList) {
-		var chan = chanList[chanindex];
-		if (chan["channelId"] == channelName) {
-			channelConfigPath = chan["channelConfigPath"];
-			break;
-		}
-	}
-	logger.debug('Channel name : ' + channelName);
-	logger.debug('channelConfigPath : ' + channelConfigPath); //channelConfigPath
-	if (!channelName) {
-		res.json(getErrorMessage('\'channelName\''));
-		return;
-	}
-	if (!channelConfigPath) {
-		res.json(getErrorMessage('\'channelConfigPath\''));
-		return;
-	}
-
-	channels.createChannel(channelName, channelConfigPath, req.username, req.orgname)
-		.then(function (message) {
-			res.json(message);
-			// if (message && typeof message !== 'string') {
-			// 	res.json(message);
-			// } else {
-			// 	logger.info(message);
-			// 	let jmsg = JSON.parse(message);
-			// 	if (jmsg && typeof jmsg !== 'string') {
-			// 		res.json(jmsg);
-			// 	}
-			// 	else {
-			// 		res.json({
-			// 			success: false,
-			// 			info: jmsg
-			// 		});
-			// 	}
-			// }
-		});
-});
-// Join Channel
-app.post('/channels/peers', function (req, res) {
-	logger.info('<<<<<<<<<<<<<<<<< J O I N  C H A N N E L >>>>>>>>>>>>>>>>>');
-	var channelName;
-	if (req.body.channelName) {
-		channelName = req.body.channelName;
-	} else {
-		channelName = defaultChannelId; //默认第一个Channel
-	}
-
-	var peers = req.body.peers;
-	var orgname = req.orgname;
-	if (req.body.orgname) {
-		orgname = req.body.orgname;
-	}
-
-	logger.debug('channelName : ' + channelName);
-	logger.debug('peers : ' + peers);
-	if (!channelName) {
-		res.json(getErrorMessage('\'channelName\''));
-		return;
-	}
-	if (!peers || peers.length == 0) {
-		res.json(getErrorMessage('\'peers\''));
-		return;
-	}
-
-	join.joinChannel(channelName, peers, req.username, orgname)
-		.then(function (message) {
-			res.json(message);
-			// if (message && typeof message !== 'string') {
-			// 	res.json(message);
-			// } else {
-			// 	logger.info(message);
-			// 	let jmsg = JSON.parse(message);
-			// 	if (jmsg && typeof jmsg !== 'string') {
-			// 		res.json(jmsg);
-			// 	}
-			// 	else {
-			// 		res.json({
-			// 			success: false,
-			// 			info: jmsg
-			// 		});
-			// 	}
-			// }
-		});
-});
-// Install chaincode on target peers
-app.post('/chaincodes', function (req, res) {
-	logger.debug('==================== INSTALL CHAINCODE ==================');
-	var peers = req.body.peers;
-
-	var chaincodeName = req.body.chaincodeName;
-	var chaincodePath = req.body.chaincodePath;
-	var chaincodeVersion = req.body.chaincodeVersion;
-	logger.debug('peers : ' + peers); // target peers list
-	logger.debug('chaincodeName : ' + chaincodeName);
-	logger.debug('chaincodePath  : ' + chaincodePath);
-	logger.debug('chaincodeVersion  : ' + chaincodeVersion);
-	if (!peers || peers.length == 0) {
-		res.json(getErrorMessage('\'peers\''));
-		return;
-	}
-	if (!chaincodeName) {
-		res.json(getErrorMessage('\'chaincodeName\''));
-		return;
-	}
-	if (!chaincodePath) {
-		res.json(getErrorMessage('\'chaincodePath\''));
-		return;
-	}
-	if (!chaincodeVersion) {
-		res.json(getErrorMessage('\'chaincodeVersion\''));
-		return;
-	}
-
-	install.installChaincode(peers, chaincodeName, chaincodePath, chaincodeVersion, req.username, req.orgname)
-		.then(function (message) {
-			res.json(message);
-			// if (message && typeof message !== 'string') {
-			// 	res.json(message);
-			// } else {
-			// 	logger.info(message);
-			// 	let jmsg = JSON.parse(message);
-			// 	if (jmsg && typeof jmsg !== 'string') {
-			// 		res.json(jmsg);
-			// 	}
-			// 	else {
-			// 		res.json({
-			// 			success: false,
-			// 			info: jmsg
-			// 		});
-			// 	}
-			// }
-		});
-});
-// Instantiate chaincode on target peers
-app.post('/channels/chaincodes', function (req, res) {
-	logger.debug('==================== INSTANTIATE CHAINCODE ==================');
-	var chaincodeName = req.body.chaincodeName;
-	var chaincodeVersion = req.body.chaincodeVersion;
-	var channelName;
-	if (req.body.channelName) {
-		channelName = req.body.channelName;
-	} else {
-		channelName = defaultChannelId; //channelName
-	}
-	var fcn = req.body.fcn;
-	var args = req.body.args;
-	logger.debug('channelName  : ' + channelName);
-	logger.debug('chaincodeName : ' + chaincodeName);
-	logger.debug('chaincodeVersion  : ' + chaincodeVersion);
-	logger.debug('fcn  : ' + fcn);
-	logger.debug('args  : ' + args);
-	if (!chaincodeName) {
-		res.json(getErrorMessage('\'chaincodeName\''));
-		return;
-	}
-	if (!chaincodeVersion) {
-		res.json(getErrorMessage('\'chaincodeVersion\''));
-		return;
-	}
-	if (!channelName) {
-		res.json(getErrorMessage('\'channelName\''));
-		return;
-	}
-	if (!args) {
-		res.json(getErrorMessage('\'args\''));
-		return;
-	}
-	instantiate.instantiateChaincode(channelName, chaincodeName, chaincodeVersion, fcn, args, req.username, req.orgname)
-		.then(function (message) {
-			if (message && typeof message !== 'string') {
-				res.json(message);
-			} else {
-				logger.info(message);
-				let jmsg = JSON.parse(message);
-				if (jmsg && typeof jmsg !== 'string') {
-					res.json(jmsg);
-				}
-				else {
-					res.json({
-						success: false,
-						info: jmsg
-					});
-				}
-			}
-		});
-});
-// UPdate chaincode on target peers
-app.put('/channels/chaincodes', function (req, res) {
-	logger.debug('==================== UPGRADE CHAINCODE ==================');
-	var chaincodeName = req.body.chaincodeName;
-	var chaincodeVersion = req.body.chaincodeVersion;
-	var channelName;
-	if (req.body.channelName) {
-		channelName = req.body.channelName;
-	} else {
-		channelName = defaultChannelId; //channelName
-	}
-
-	var fcn = req.body.fcn;
-	var args = req.body.args;
-	logger.debug('channelName  : ' + channelName);
-	logger.debug('chaincodeName : ' + chaincodeName);
-	logger.debug('chaincodeVersion  : ' + chaincodeVersion);
-	logger.debug('fcn  : ' + fcn);
-	logger.debug('args  : ' + args);
-	if (!chaincodeName) {
-		res.json(getErrorMessage('\'chaincodeName\''));
-		return;
-	}
-	if (!chaincodeVersion) {
-		res.json(getErrorMessage('\'chaincodeVersion\''));
-		return;
-	}
-	if (!channelName) {
-		res.json(getErrorMessage('\'channelName\''));
-		return;
-	}
-	if (!args) {
-		res.json(getErrorMessage('\'args\''));
-		return;
-	}
-
-	upgrade.updateChaincode(channelName,chaincodeName, chaincodeVersion, req.username, req.orgname)
-		.then(function (message) {
-			if (message && typeof message !== 'string') {
-				res.json(message);
-			} else {
-				logger.info(message);
-				let jmsg = JSON.parse(message);
-				if (jmsg && typeof jmsg !== 'string') {
-					res.json(jmsg);
-				}
-				else {
-					res.json({
-						success: false,
-						info: jmsg
-					});
-				}
-			}
-		});
-});
 // Invoke transaction on chaincode on target peers
 app.post('/channels/:channel/chaincodes/:chaincodeName', function (req, res) {
 	logger.debug('==================== INVOKE ON CHAINCODE ==================');
 	var peers = req.body.peers;
 	var chaincodeName = req.params.chaincodeName;
 	var channelName = req.params.channel;
+	var username = req.body.username;
+	var orgname = req.body.orgName;
 	var fcn = req.body.fcn;
 	var args = req.body.args;
 	logger.debug('channelName  : ' + channelName);
@@ -452,25 +170,27 @@ app.post('/channels/:channel/chaincodes/:chaincodeName', function (req, res) {
 		res.json(getErrorMessage('\'args\''));
 		return;
 	}
-
-	invoke.invokeChaincode(peers, channelName, chaincodeName, fcn, args, req.username, req.orgname)
-		.then(function (message) {
-			if (message && typeof message !== 'string') {
-				res.json(message);
-			} else {
-				// logger.info(message);
-				// let jmsg = JSON.parse(message);
-				// if (jmsg && typeof jmsg !== 'string') {
-				// 	res.json(jmsg);
-				// }
-				// else {
-				res.json({
-					success: true,
-					info: message
-				});
-				// }
-			}
-		});
+	helper.loginRegisteredUser(username, orgname).then(function(result) {
+		if (result == true) {
+			invoke.invokeChaincode(peers, channelName, chaincodeName, fcn, args, req.username, req.orgname)
+			.then(function (message) {
+				if (message && typeof message !== 'string') {
+					res.json(message);
+				} else {
+					res.json({
+						success: true,
+						info: message
+					});
+				}
+			});
+		}else{
+			res.json({
+				success: false,
+				info: "账号错误，请确认用户名和组织ID正确"
+			});
+		}
+	});
+	
 });
 // post Query on chaincode on target peers
 app.post('/query/channels/:channel/chaincodes/:chaincodeName', function (req, res) {

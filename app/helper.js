@@ -364,6 +364,30 @@ var registerUser = function (username, userOrg, isJson) {
 	});
 };
 
+var loginRegisteredUser = function (username, userOrg) {
+	var client = getClientForOrg(userOrg);
+	return hfc.newDefaultKeyValueStore({
+		path: getKeyStoreForOrg(getOrgName(userOrg))
+	}).then((store) => {
+		client.setStateStore(store);
+		// clearing the user context before switching
+		client._userContext = null;
+		return client.getUserContext(username, true).then((user) => {
+			if (user && user.isEnrolled()) {
+				logger.info('Successfully loaded member from persistence');
+				return user;
+			} else {
+				client.setUserContext(user);
+				return user;
+			}
+		});
+	}).then((user) => {
+		return true;
+	}, (err) => {
+		logger.error(util.format('Failed to get registered user: %s, error: %s', username, err.stack ? err.stack : err));
+		return false;
+	});
+}
 
 var getRegisteredUsers = function (username, userOrg, isJson) {
 	var member;
@@ -372,7 +396,6 @@ var getRegisteredUsers = function (username, userOrg, isJson) {
 	return hfc.newDefaultKeyValueStore({
 		path: getKeyStoreForOrg(getOrgName(userOrg))
 	}).then((store) => {
-		console.log(client);
 		client.setStateStore(store);
 		// clearing the user context before switching
 		client._userContext = null;
@@ -589,6 +612,7 @@ exports.newPeers = newPeers;
 exports.newEventHubs = newEventHubs;
 exports.registerUser = registerUser;
 exports.getRegisteredUsers = getRegisteredUsers;
+exports.loginRegisteredUser = loginRegisteredUser;
 exports.getOrgAdmin = getOrgAdmin;
 exports.getAdminUser = getAdminUser;
 exports.eventWaitTime = eventWaitTime;
